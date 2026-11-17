@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Blast – English A1</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#06090d;--gold:#f0b429;--green:#34d399;--red:#f87171;--blue:#60a5fa;--text:#e8f4f2;--muted:#7b8f93}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#2b2f33;color:var(--text);font-family:'Tajawal',sans-serif;min-height:100vh;display:flex;justify-content:center}
+#wrap{width:100%;max-width:480px;padding:8px;display:flex;flex-direction:column;align-items:center}
+#stagebox{position:relative;width:100%;display:flex;justify-content:center}
+canvas{height:72vh;max-width:100%;aspect-ratio:2/3;background:#0b1a1f;display:block;border-radius:6px}
+#pauseBtn{position:absolute;top:10px;left:10px;width:34px;height:34px;border-radius:8px;border:none;background:rgba(255,255,255,.12);color:#fff;font-size:1rem;cursor:pointer;z-index:3}
+#overlay{position:absolute;inset:0;margin:auto;height:72vh;max-width:100%;aspect-ratio:2/3;background:rgba(4,10,14,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;border-radius:6px;z-index:4}
+#overlay.hide{display:none}
+#overlay h1{font-size:2rem;font-weight:900;color:var(--gold);font-family:'Space Mono',monospace;direction:ltr}
+#overlay p{color:#b8c9cc;line-height:1.9;font-size:.92rem}
+.btn{padding:12px 28px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--gold),#d97706);color:#000;font-weight:900;font-size:1rem;font-family:inherit;cursor:pointer}
+.btn2{padding:8px 16px;border-radius:10px;border:1px solid #44585c;background:transparent;color:var(--text);font-family:inherit;cursor:pointer}
+.inrow{display:flex;gap:8px;width:100%;margin-top:8px;direction:ltr}
+#inp{flex:1;padding:13px;border-radius:12px;border:1px solid #3a4b4f;background:#10222a;color:#fff;font-size:1.1rem;font-family:'Space Mono',monospace;outline:none}
+#inp:focus{border-color:var(--gold)}
+#inp.shake{animation:sh .3s;border-color:var(--red)}
+@keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.mic{padding:0 18px;border-radius:12px;border:1px solid var(--blue);background:rgba(96,165,250,.12);color:var(--blue);cursor:pointer;font-size:1.2rem}
+.mic.on{background:rgba(248,113,113,.2);border-color:var(--red);color:var(--red);animation:pl 1s infinite}
+@keyframes pl{50%{opacity:.55}}
+#heard{min-height:20px;margin-top:6px;font-size:.8rem;color:#9fb4b8;font-family:'Space Mono',monospace;direction:ltr;width:100%}
+.sb{position:absolute;bottom:12px;width:34px;height:34px;border-radius:8px;border:none;background:rgba(255,255,255,.12);color:#fff;font-size:1rem;cursor:pointer;z-index:3}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%;direction:ltr}
+.sg{padding:12px 0;border-radius:10px;border:1px solid #44585c;background:#10222a;color:#fff;font-family:'Space Mono',monospace;font-weight:700;cursor:pointer}
+.sg.done{border-color:var(--green);color:var(--green)}.sg.lock{opacity:.35;cursor:not-allowed}
+</style></head><body>
+<div id="wrap">
+  <div id="stagebox">
+    <canvas id="cv" width="480" height="720"></canvas>
+    <button id="pauseBtn" onclick="togglePause()">❚❚</button>
+    <button class="sb" style="left:10px" onclick="openMap()" title="المراحل">☰</button><button class="sb" style="left:52px" id="musBtn" onclick="toggleMus()">🎵</button>
+    <div id="overlay"></div>
+  </div>
+  <div class="inrow"><input id="inp" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the English word…"><button class="mic" id="micBtn" onclick="toggleMic()">🎤</button></div>
+  <div id="heard"></div>
+</div>
+<script>
+const D=[
+{t:'Say hello',w:['مرحبا|hello/hi|n','وظيفة|job|n','شركة|company|n','مشتري|buyer|n','تصدير|export|n','برتقال|orange/oranges|n','غدا|tomorrow|n','يبيع|sell|v','يتحدث|talk/speak|v','يلتقي|meet|v','يعمل|work|v','و|and|c','في|in|c','إلى|to|c','أين|where|c','ماذا|what|c','نعم|yes|c']},
+{t:'Your product',w:['عينة|sample|n','شهادة|certificate|n','جودة|quality|n','منطقة|region|n','أسابيع|weeks|n','حلو|sweet|a','طازج|fresh|a','كبير|big|a','يرسل|send|v','يأتي|come|v','يبقى|stay|v','يملك|have|v','من|from|c','جدا|very|c','لكن|but|c','أيضا|also|c','لأن|because|c']},
+{t:'What the client needs',w:['طن|ton|n','صندوق|box|n','حجم|size|n','طلبية|order|n','شهر|month|n','كيلو|kilo/kilogram|n','متوسط|medium|a','يريد|want|v','يحتاج|need|v','يشتري|buy|v','يكرر|repeat|v','يستطيع|can|v','لكل|per|c','أو|or|c','بعض|some|c','من فضلك|please|c','كم|how many|c']},
+{t:'The price',w:['ثمن|price|n','أورو|euro/euros|n','دولار|dollar/dollars|n','تخفيض|discount|n','ثلاثون|thirty|n','أرخص|cheaper|a','مرتفع|high|a','أفضل|better|a','صالح|valid|a','يعطي|give|v','يكلف|cost|v','يفكر|think|v','من أجل|for|c','متى|when|c','قليلا|little|c','الآن|now|c']},
+{t:'Delivery',w:['باخرة|ship|n','شاحنة|truck|n','مستودع|warehouse|n','تسليم|delivery|n','ميناء|port|n','أيام|days|n','تاريخ|date|n','بريد إلكتروني|email/e-mail|n','متجر|shop/store|n','الأول|first|a','يأخذ|take|v','يوصل|deliver|v','يحضر|bring|v','عبر|by|c','حتى|until|c','كيف|how|c','حوالي|about|c']},
+{t:'Payment',w:['بنك|bank|n','نصف|half|n','تحويل|transfer|n','مال|money|n','تفاصيل|details|n','بطاقة|card|n','نقدا|cash|n','يدفع|pay|v','يقول|say|v','يعرف|know|v','قبل|before|c','بعد|after|c','ثم|then|c','مع|with|c','ببطء|slowly|c','لماذا|why|c']},
+{t:'Confirm the order',w:['المجموع|total|n','فاتورة|invoice|n','كمية|quantity|n','عقد|contract|n','اتفاق|agreement|n','جاهز|ready|a','يؤكد|confirm|v','يوقع|sign|v','يحتوي|contain|v','يوافق|agree|v','بالتأكيد|of course|c','لا|no|c','إذا|if|c','هذا|this|c','ذلك|that|c','كل|all|c']},
+{t:'Documents',w:['وثيقة|document|n','لائحة التعبئة|packing list|n','المنشأ|origin|n','شهادة المنشأ|certificate of origin|n','أسماء|names|n','أرقام|numbers|n','جمارك|customs|n','ختم|stamp|n','صناديق|boxes|n','صحيح|correct|a','يتحقق|check|v','يبين|show|v','يحصل|get|v','يقرأ|read|v','داخل|inside|c','كل شيء|everything|c','أي|which|c','فقط|only|c']},
+{t:'A problem',w:['مشكل|problem|n','طقس|weather|n','حل|solution|n','الجمعة|friday|n','متأخر|late|a','سيئ|bad|a','بخير|fine/ok|a','آسف|sorry|a','يصل|arrive|v','ينتظر|wait|v','يصلح|fix|v','يخبر|tell|v','يكتب|write|v','كل يوم|every day|c','قريبا|soon|c','ما زال|still|c']},
+{t:'Thank you',w:['شكرا|thank you/thanks|n','زبون|customer|n','أخبار|news|n','مساعدة|help|n','شريك|partner|n','مستقبل|future|n','معرض|fair|n','فواكه|fruits|n','يوسفي|mandarin/mandarins|n','يشكر|thank|v','يرى|see|v','يحب|like|v','يتمنى|hope|v','مرة أخرى|again|c','الشهر المقبل|next month|c','هناك|there|c','آخر|other|c']}
+];
+const ALL=D.flatMap(s=>s.w.map(x=>{const[a,b,k]=x.split('|');return{ar:a,en:b.split('/'),k}}));
+const $=id=>document.getElementById(id);
+const norm=t=>String(t).toLowerCase().replace(/[^a-z0-9\s'-]/g,' ').replace(/\s+/g,' ').trim();
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const cv=$('cv'),ctx=cv.getContext('2d'),W=480,H=720,SHIP={x:W/2,y:H-70};
+let best=0;try{best=+localStorage.getItem('wb_best')||0}catch(e){}
+let actx;function beep(f,d,type,v){try{actx=actx||new(window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.type=type||'sine';o.frequency.value=f;g.gain.value=v||.07;o.connect(g);g.connect(actx.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,actx.currentTime+d);o.stop(actx.currentTime+d)}catch(e){}}
+
+const X=[['اسم|name|n','نحن|we|c','أنت|you|c'],['هو|he|c','جيد|good|a','المغرب|morocco|n'],['عشرة|ten|n','مئة|hundred|n','ألف|thousand|n'],['غالي|expensive|a','رخيص|inexpensive|a','اليوم|today|n','هنا|here|c'],['الأسبوع المقبل|next week|c','الصباح|morning|n','سريع|fast|a'],['حساب|account|n','رقم|number|n','سهل|easy|a','يستعمل|use|v'],['يقرر|decide|v','يغير|change|v','سعيد|happy|a','ممتاز|great|a'],['ورقة|paper|n','نسخة|copy|n'],['يتصل|call|v','هاتف|phone|n','لا بأس|no problem|c','مشغول|busy|a'],['يوم|day|n','سنة|year|n','رائع|wonderful|a']];
+const S=[
+['مرحبا أنا مشتري|hello i am a buyer','نحن نبيع البرتقال|we sell oranges','أين الشركة|where is the company','نعم أنا أعمل في الشركة|yes i work in the company','نحن نلتقي غدا|we meet tomorrow','ماذا تبيع|what do you sell','أنا أتحدث إلى المشتري|i talk to the buyer','وظيفتي التصدير|my job is export','نحن نصدر البرتقال|we export oranges','أين تعمل|where do you work'],
+['أنا أملك عينة|i have a sample','نحن نرسل عينة|we send a sample','البرتقال حلو جدا|the oranges are very sweet','الجودة جيدة جدا|the quality is very good','أنا آتي من المغرب|i come from morocco','البرتقال طازج وحلو|the oranges are fresh and sweet','نحن نبقى في المنطقة|we stay in the region','أنت تملك شهادة|you have a certificate','الشهادة جيدة أيضا|the certificate is also good','أرسل البرتقال لأنه طازج|i send oranges because they are fresh'],
+['أريد طلبية|i want an order','نحتاج إلى طن|we need a ton','كم كيلو تريد|how many kilo do you want','الحجم متوسط|the size is medium','من فضلك كرر الطلبية|please repeat the order','نشتري بعض البرتقال|we buy some oranges','أستطيع أن أشتري صندوقا|i can buy a box','نريد طلبية لكل شهر|we want an order per month','أريد مئة كيلو|i want a hundred kilo','نحتاج ألف كيلو|we need a thousand kilo'],
+['ما الثمن|what is the price','الثمن مرتفع|the price is high','أريد ثمنا أرخص|i want a cheaper price','نعطيك تخفيضا|we give you a discount','ماذا يكلف الطن|what does the ton cost','الثمن بالأورو|the price is in euro','هذا أفضل ثمن|this is a better price','أفكر في الثمن|i think about the price','الثمن غالي اليوم|the price is expensive today','نريد ثمنا رخيصا|we want an inexpensive price'],
+['الباخرة في الميناء|the ship is in the port','الشاحنة سريعة|the truck is fast','التسليم الأسبوع المقبل|the delivery is next week','أين المستودع|where is the warehouse','نوصل الطلبية غدا|we deliver the order tomorrow','ما تاريخ التسليم|what is the delivery date','أرسل بريدا إلكترونيا|i send an email','نأخذ الشاحنة إلى الميناء|we take the truck to the port','الطلبية الأولى في الصباح|the first order is in the morning','كيف تحضر الطلبية|how do you bring the order'],
+['أدفع نصف الثمن|i pay half the price','التحويل إلى البنك|the transfer is to the bank','أين رقم الحساب|where is the account number','أدفع بالبطاقة|i pay with the card','هل تدفع نقدا|do you pay cash','نعطيك التفاصيل|we give you the details','أدفع قبل التسليم|i pay before the delivery','ندفع بعد التسليم|we pay after the delivery','لماذا تدفع نصف المال|why do you pay half the money','التحويل سهل|the transfer is easy'],
+['المجموع ألف أورو|the total is a thousand euro','هذه الفاتورة|this is the invoice','أؤكد الكمية|i confirm the quantity','هل أنت جاهز|are you ready','نعم بالتأكيد|yes of course','أوقع العقد|i sign the contract','نوافق على الاتفاق|we agree with the agreement','أنا سعيد بالعقد|i am happy with the contract','إذا أنت جاهز أنا أوقع|if you are ready i sign','العقد ممتاز|the contract is great'],
+['أقرأ الوثيقة|i read the document','أين لائحة التعبئة|where is the packing list','أبين شهادة المنشأ|i show the certificate of origin','الأرقام صحيحة|the numbers are correct','أتحقق من الأسماء|i check the names','الختم داخل الوثيقة|the stamp is inside the document','أحصل على نسخة|i get a copy','كل شيء صحيح|everything is correct','أريد نسخة فقط|i want only a copy','الصناديق في الجمارك|the boxes are in the customs'],
+['عندنا مشكل|we have a problem','الطقس سيئ|the weather is bad','الباخرة متأخرة|the ship is late','أنا آسف|i am sorry','نصلح المشكل قريبا|we fix the problem soon','أنتظر حتى الجمعة|i wait until friday','أخبرك كل يوم|i tell you every day','ما الحل|what is the solution','أكتب لك بريدا|i write you an email','الشاحنة تصل غدا|the truck arrives tomorrow'],
+['شكرا لك|thank you','أنت زبون رائع|you are a wonderful customer','أنا أحب الفواكه|i like fruits','أتمنى أن نلتقي مرة أخرى|i hope we meet again','أرى الأخبار|i see the news','أنت شريك رائع|you are a wonderful partner','المعرض الشهر المقبل|the fair is next month','أشكرك على المساعدة|i thank you for the help','المستقبل جيد|the future is good','نحب اليوسفي|we like mandarins']
+];
+const P=x=>{const[a,b,k]=x.split('|');return{ar:a,en:b.split('/'),k}};
+const SP=x=>{const[a,b]=x.split('|');return{ar:a,en:[norm(b)],raw:b,k:'s'}};
+const okm=(en,v,loose)=>{const a=norm(en);if(!loose)return a==v;const p=' '+v+' ';if(p.includes(' '+a+' '))return true;const aw=a.split(' ');return aw.length>3&&aw.filter(x=>p.includes(' '+x+' ')).length>=Math.ceil(aw.length*.8)};
+let dn=0;try{dn=Math.min(D.length,Math.max(6,+localStorage.getItem('wb_dn')||0))}catch(e){}
+function ac(){actx=actx||new(window.AudioContext||window.webkitAudioContext)();if(actx.state=='suspended')actx.resume();return actx}
+let musOn=true,musT=0,musI=0,musTm=null,musTh=-1;
+const mf=n=>440*Math.pow(2,(n-69)/12),ex=(sc,d)=>{const n=sc.length,m=((d%n)+n)%n;return sc[m]+12*Math.floor(d/n)},SH=[0,1,-1,2];
+// t = seconds per step, w = chord wave, lw = lead wave, k = lead base note, sc = scale, ch = 4 chords, ar = arpeggio, ld = lead (scale degrees)
+const TH=[
+{n:'Sunrise',t:.45,w:'triangle',lw:'sine',k:72,sc:[0,2,4,7,9],ch:[[60,64,67],[57,60,64],[53,57,60],[55,59,62]],ar:[0,1,2,1,2,1,0,2],ld:[2,null,3,null,4,3,null,1]},
+{n:'Breeze',t:.40,w:'sine',lw:'triangle',k:67,sc:[0,2,4,7,9],ch:[[55,59,62],[52,55,59],[60,64,67],[62,66,69]],ar:[0,1,2,1,0,2,1,2],ld:[3,4,5,null,4,3,null,2]},
+{n:'Market',t:.38,w:'triangle',lw:'square',k:74,sc:[0,2,3,5,7,9,10],ch:[[62,65,69],[55,59,62],[60,64,67],[62,65,69]],ar:[0,2,1,2,0,2,1,2],ld:[0,2,4,2,5,4,2,null]},
+{n:'Harbor',t:.42,w:'sine',lw:'triangle',k:69,sc:[0,2,3,5,7,8,10],ch:[[57,60,64],[53,57,60],[60,64,67],[55,59,62]],ar:[0,1,2,1,2,1,2,1],ld:[4,null,2,null,3,2,0,null]},
+{n:'Express',t:.32,w:'triangle',lw:'square',k:76,sc:[0,2,4,7,9],ch:[[52,56,59],[57,61,64],[59,63,66],[57,61,64]],ar:[0,2,1,2,0,2,1,2],ld:[0,1,2,null,2,3,2,null]},
+{n:'Lantern',t:.50,w:'sine',lw:'sine',k:77,sc:[0,2,4,6,7,9,11],ch:[[53,57,60],[55,59,62],[57,60,64],[60,64,67]],ar:[0,1,2,1,2,1,0,1],ld:[2,null,4,null,3,null,5,4]},
+{n:'Pulse',t:.30,w:'triangle',lw:'sawtooth',k:71,sc:[0,2,3,5,7,8,11],ch:[[59,62,66],[55,59,62],[62,66,69],[57,61,64]],ar:[0,2,1,2,0,2,1,2],ld:[0,null,3,2,null,4,3,null]},
+{n:'Oasis',t:.40,w:'triangle',lw:'sine',k:74,sc:[0,1,4,5,7,8,10],ch:[[62,66,69],[63,67,70],[62,66,69],[63,67,70]],ar:[0,1,2,1,0,2,1,2],ld:[0,1,2,null,3,2,1,null]},
+{n:'Starlight',t:.36,w:'sine',lw:'triangle',k:72,sc:[0,2,4,6,7,9,11],ch:[[60,64,67],[62,66,69],[52,55,59],[60,64,67]],ar:[0,1,2,1,2,1,0,2],ld:[4,5,6,null,5,4,2,null]},
+{n:'Victory',t:.28,w:'triangle',lw:'square',k:72,sc:[0,2,4,5,7,9,11],ch:[[60,64,67],[55,59,62],[57,60,64],[53,57,60]],ar:[0,2,1,2,0,2,1,2],ld:[0,2,4,2,4,5,4,null]}
+];
+function pn(f,t,d,v,type){try{const a=ac(),o=a.createOscillator(),o2=a.createOscillator(),g=a.createGain();o.type=type||'triangle';o2.type='sine';o.frequency.value=f;o2.frequency.value=f*2;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);o2.connect(g);g.connect(a.destination);o.start(t);o2.start(t);o.stop(t+d);o2.stop(t+d)}catch(e){}}
+function MV(){const step=G.ph==0?6:3;return Math.min(3,Math.floor((G.stageDone||0)/step))}
+function mkT(st,v){const B=TH[st%TH.length],tr=[0,3,5,7][v],ch=B.ch.map((_,i)=>B.ch[(i+v)%4].map(n=>n+tr)),ld=v%2?B.ld.slice().reverse():B.ld,ar=v>=2?B.ar.slice().reverse():B.ar;return{t:B.t*[1,.9,.8,.7][v],w:B.w,lw:v==1?'triangle':v==3?'square':B.lw,k:B.k+tr,sc:B.sc,ch,ar,ld}}
+function musicStart(){if(musTm)return;ac();musT=actx.currentTime+.1;musTm=setInterval(()=>{if(!actx)return;const now=actx.currentTime;if(!musOn||!G||G.paused||G.over){musT=Math.max(musT,now+.1);return}
+  const v=MV(),key=(G.st||0)*4+v;
+  if(musTh!==key){musTh=key;musI=0;musT=Math.max(musT,now+.1)}
+  const T=mkT(G.st||0,v);
+  while(musT<now+.5){const ci=Math.floor(musI/8)%4,s=musI%8,c=T.ch[ci];
+    if(s==0)pn(mf(c[0]-12),musT,T.t*5,.05,T.w);
+    const ai=T.ar[s];pn(mf(ai<3?c[ai]:c[0]+12),musT,T.t*2.4,.035,T.w);
+    const d=T.ld[s];if(d!=null)pn(mf(T.k+ex(T.sc,d+SH[ci])),musT,T.t*1.6,.028,T.lw);
+    if(s%4==2)pn(mf(c[2]+12),musT,T.t*2,.012,'sine');
+    musI++;musT+=T.t}},200)}
+function toggleMus(){musOn=!musOn;$('musBtn').textContent=musOn?'🎵':'🔇'}
+function say(t){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=.9;const v=speechSynthesis.getVoices().find(x=>/^en/i.test(x.lang));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
+
+let G=null,raf=0,last=0,gridY=0;
+function overlay(h){const o=$('overlay');o.innerHTML=h;o.classList.remove('hide')}
+function menu(inG){let g='';D.forEach((s,i)=>{const lk=i>dn;g+=`<button class="sg ${lk?'lock':i<dn?'done':''}" ${lk?'disabled':`onclick="startGame(${i})"`}>${lk?'🔒':i<dn?'✓':''} ${i+1}</button>`});
+  overlay(`<h1>WORD BLAST</h1><p>كل مرحلة 3 أجزاء: 20 كلمة تسقط عشوائيا، ثم 10 جمل تسقط (انطقها أو اكتبها)، ثم 10 جمل عربية تترجمها.<br>4 أخطاء = تعيد المرحلة من بدايتها 🛡️<br>السرعة تزيد مع كل مرحلة وتنخفض قليلا في الجمل، ولكل مرحلة 4 ألحان تتبدل مع تقدمك 🎵<br><span style="color:var(--gold)">Best: ${best} — المراحل المكتملة: ${dn}/${D.length}</span></p><div class="grid">${g}</div>${inG?'<button class="btn2" onclick="resumeG()">▶ متابعة</button>':'<button class="btn" onclick="startGame()">▶ ابدأ</button>'}`)}
+function openMap(){if(G&&G.run&&!G.over){G.paused=true;menu(true)}else menu()}
+function resumeG(){G.paused=false;$('overlay').classList.add('hide');last=performance.now();$('inp').focus()}
+function startGame(i){const st=typeof i=='number'?i:Math.min(dn,D.length-1);
+  G={run:1,st,ph:0,qT:0,hint:0,q:null,sub:'',deck:[],ptr:0,words:[],bullets:[],parts:[],stageTotal:0,stageDone:0,lives:4,score:0,combo:0,mul:1,spawnT:.5,banner:0,bannerTxt:'',over:false,paused:false,flash:0,reveal:'',revealT:0,shake:0};
+  loadStage(0);$('overlay').classList.add('hide');$('inp').value='';$('inp').focus();last=performance.now();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);musicStart()}
+function loadStage(ph){
+  G.ph=ph||0;let items;
+  if(G.ph==0)items=D[G.st].w.concat(X[G.st]).slice(0,20).map(P);else items=S[G.st].map(SP);
+  G.bannerTxt=`STAGE ${G.st+1} · ${['WORDS','SENTENCES','TRANSLATE'][G.ph]}`;
+  G.sub=D[G.st].t+' — '+['20 كلمة: اكتبها أو انطقها','10 جمل: اكتبها أو انطقها بالإنجليزية','ترجم الجملة العربية إلى الإنجليزية'][G.ph];
+  G.deck=shuffle(items);G.ptr=0;G.stageTotal=items.length;G.stageDone=0;G.banner=2.2;G.spawnT=1.4;G.words=[];G.bullets=[];G.q=null;G.qT=0;G.hint=0;if(G.ph==2)nextQ()}
+function nextQ(){G.q=G.deck[G.ptr++]||null;G.hint=0}
+function correct(){const q=G.q;G.q=null;explode(W/2,260,'#f7d070',40);G.stageDone++;G.combo++;G.score+=15+Math.min(G.combo,10)*2;beep(900,.1,'square',.05);say(q.raw);G.qT=1.1}
+function ans(t,loose){if(!G.q)return false;const v=norm(t);if(!v)return false;if(G.q.en.some(a=>okm(a,v,loose))){correct();return true}return false}
+function miss2(){G.lives--;G.combo=0;G.flash=.35;G.shake=.3;G.hint=1;beep(150,.3,'sawtooth',.09);inp.classList.add('shake');setTimeout(()=>inp.classList.remove('shake'),300);if(G.lives<=0)failStage()}
+function failStage(){G.lives=4;G.combo=0;G.mul=1;G.flash=.5;G.shake=.5;beep(110,.5,'sawtooth',.1);loadStage(0);G.bannerTxt='4 أخطاء! المرحلة '+(G.st+1)+' من جديد';G.reveal=''}
+const LS=["Hello, I am a buyer. I work in a company in Morocco. We export oranges to Europe. My job is export, and I talk to the buyer every day. Where is the company? The company is in the region. What do you sell? We sell oranges and fruits. Yes, I work in the company. Tomorrow we meet, and I have a sample for you.", "I have a sample of oranges. The oranges are fresh and very sweet. The quality is very good, and I come from Morocco. We send a sample to the buyer today. You have a certificate, and we stay in the region. The buyer likes the sample, and he says the quality is good. I am happy with the oranges.", "I want an order. We need a ton of oranges. How many kilo do you want? The size is medium. Please repeat the order. We buy some oranges every month, and I can buy a box. I want a hundred kilo today. We want an order per month, and the buyer says yes.", "What is the price? The price is high today. I want a cheaper price. We give you a discount, and this is a better price. What does the ton cost? The price is in euro. I think about the price, and then I say yes. The buyer is happy with the discount.", "The ship is in the port. The truck is fast, and the delivery is next week. Where is the warehouse? We deliver the order tomorrow. What is the delivery date? I send an email to the buyer. We take the truck to the port, and the ship leaves with the oranges.", "I pay half the price. The transfer is to the bank. Where is the account number? I pay with the card, but you pay cash. We give you the details. I pay before the delivery, and we pay after the delivery. The buyer sends the money to the bank today.", "The total is a thousand euro. This is the invoice. I confirm the quantity. Are you ready? Yes, of course. I sign the contract, and we agree with the agreement. I am happy with the contract. If you are ready, I sign today, and we start the order.", "I read the document. Where is the packing list? I show the certificate of origin. The numbers are correct, and I check the names. The stamp is inside the document. I get a copy, and everything is correct. The buyer reads the papers and says thank you.", "We have a problem. The weather is bad, and the ship is late. I am sorry. We fix the problem soon. I wait until Friday, and I tell you every day. What is the solution? I write you an email. The truck arrives tomorrow, and the problem is finished.", "Thank you. You are a wonderful customer and a wonderful partner. I like fruits, and I see the news every day. The fair is next month. I hope we meet again. I thank you for the help, and the future is good for us. See you at the fair."];
+function lsSay(t){try{speechSynthesis.cancel();const v=speechSynthesis.getVoices().find(x=>/^en/i.test(x.lang));(t.match(/[^.?!]+[.?!]/g)||[t]).forEach(p=>{const u=new SpeechSynthesisUtterance(p.trim());u.lang='en-US';u.rate=.85;if(v)u.voice=v;speechSynthesis.speak(u)})}catch(e){}}
+function listen(st){G.paused=true;stopMic();let n='';try{n=JSON.parse(localStorage.getItem('wb_notes')||'{}')[st]||''}catch(e){}
+  n=n.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  overlay(`<h1>🎧 LISTEN ${st+1}</h1><p>مرحلة الاستماع (~40 ثانية): استمع للفقرة ثم اكتب ما فهمته منها.</p><button class="btn" onclick="lsSay(LS[${st}])">▶ استمع / أعد</button><textarea id="lsn" dir="auto" placeholder="اكتب ما فهمته من الفقرة..." style="width:100%;height:34%;border-radius:10px;border:1px solid #44585c;background:#10222a;color:#fff;padding:10px;font-family:inherit;font-size:.95rem">${n}</textarea><button class="btn" onclick="lsDone(${st})">حفظ ومتابعة ➜</button>`)}
+function lsDone(st){try{const o=JSON.parse(localStorage.getItem('wb_notes')||'{}');o[st]=$('lsn').value;localStorage.setItem('wb_notes',JSON.stringify(o))}catch(e){}
+  try{speechSynthesis.cancel()}catch(e){}
+  if(st+1>=D.length){win();return}
+  G.st++;G.lives=4;G.mul=1;loadStage(0);G.paused=false;$('overlay').classList.add('hide');last=performance.now();$('inp').focus()}
+function advance(){G.score+=50;beep(660,.15);setTimeout(()=>beep(880,.15),150);setTimeout(()=>beep(1180,.25),300);
+  if(G.ph<2){loadStage(G.ph+1);return}
+  if(G.st+1>dn){dn=G.st+1;try{localStorage.setItem('wb_dn',dn)}catch(e){}}
+  listen(G.st)}
+function win(){G.over=true;stopMic();if(G.score>best){best=G.score;try{localStorage.setItem('wb_best',best)}catch(e){}}draw();overlay(`<h1>🏆 YOU WIN</h1><p>أكملت المراحل العشر!<br>Score: ${G.score}</p><button class="btn" onclick="menu()">☰ المراحل</button>`)}
+function wrapT(t,y,lh){const ws=t.split(' ');let l='',ls=[];for(const x of ws){const n=l?l+' '+x:x;if(ctx.measureText(n).width>W-90&&l){ls.push(l);l=x}else l=n}ls.push(l);ls.forEach((s,i)=>ctx.fillText(s,W/2,y+i*lh))}
+const baseV=()=>(20+Math.min(G.st,9)*3.2)*(G.ph==1?.68:1);
+function spawn(){
+  const item=G.deck[G.ptr];ctx.font=`700 ${item.k=='s'?17:24}px Tajawal,sans-serif`;const w=ctx.measureText(item.ar).width+22;
+  for(let k=0;k<10;k++){const x=rnd(w/2+8,W-w/2-8);
+    if(G.words.every(o=>o.y>70||Math.abs(o.x-x)>(o.w+w)/2+10)){G.ptr++;G.words.push({item,x,y:-24,w,v:rnd(.9,1.15),dying:false,seed:Math.random()*6});return true}}
+  return false}
+function loop(ts){
+  if(!G||G.over)return;const dt=Math.min(.05,(ts-last)/1000);last=ts;
+  if(!G.paused)update(dt);draw();raf=requestAnimationFrame(loop)}
+function update(dt){
+  gridY=(gridY+dt*14)%40;G.mul=Math.min(1.8,G.mul+dt*.0015);
+  if(G.banner>0)G.banner-=dt;
+  else{G.spawnT-=dt;const maxOn=G.ph==1?3:G.st<2?3:G.st<6?4:5;
+    if(G.ph<2&&G.ptr<G.deck.length&&G.words.length<maxOn&&(G.spawnT<=0||!G.words.some(w=>!w.dying))){if(spawn())G.spawnT=Math.max(.9,2.7-G.st*.14)/Math.sqrt(G.mul)*(G.ph==1?1.3:1)}}
+  if(G.ph==2&&G.banner<=0){if(G.qT>0){G.qT-=dt;if(G.qT<=0&&G.stageDone<G.stageTotal)nextQ()}else if(!G.q&&G.stageDone<G.stageTotal)nextQ()}
+  for(const w of G.words.slice()){
+    if(w.dying)continue;w.y+=baseV()*G.mul*w.v*dt;
+    if(w.y>=H-96){G.words=G.words.filter(o=>o!==w);explode(w.x,w.y,'#f87171',34);G.deck.push(w.item);G.lives--;G.combo=0;G.shake=.4;G.flash=.35;
+      G.reveal=w.item.ar+' = '+w.item.en[0];G.revealT=2;beep(150,.35,'sawtooth',.09);say(w.item.en[0]);if(G.lives<=0){failStage();return}}}
+  for(const b of G.bullets.slice()){
+    const dx=b.t.x-b.x,dy=b.t.y-b.y,d=Math.hypot(dx,dy),s=1500*dt;
+    if(d<=s+8){G.bullets=G.bullets.filter(o=>o!==b);G.words=G.words.filter(o=>o!==b.t);explode(b.t.x,b.t.y,'#f7d070',30);explode(b.t.x,b.t.y,'#ffffff',12);
+      G.stageDone++;G.combo++;G.score+=10+Math.min(G.combo,10)*2;G.mul=Math.min(1.8,G.mul+.015);beep(900,.1,'square',.05);beep(300,.2,'sawtooth',.06)}
+    else{b.x+=dx/d*s;b.y+=dy/d*s;b.tr.push([b.x,b.y]);if(b.tr.length>6)b.tr.shift()}}
+  for(const p of G.parts){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=260*dt;p.life-=dt}G.parts=G.parts.filter(p=>p.life>0);
+  if(G.flash>0)G.flash-=dt;if(G.shake>0)G.shake-=dt;if(G.revealT>0)G.revealT-=dt;
+  const fin=G.ph==2?(G.stageDone>=G.stageTotal&&G.qT<=0):(G.ptr>=G.deck.length&&G.words.length==0&&G.bullets.length==0&&G.banner<=0);if(fin&&G.lives>0)advance()}
+function explode(x,y,c,n){for(let i=0;i<n;i++){const a=rnd(0,6.28),s=rnd(60,320);G.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-60,life:rnd(.4,.9),c,r:rnd(1.5,3.5)})}}
+function draw(){
+  ctx.save();if(G.shake>0)ctx.translate(rnd(-5,5),rnd(-5,5));
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#0a1a20');g.addColorStop(1,'#0e2a30');ctx.fillStyle=g;ctx.fillRect(-10,-10,W+20,H+20);
+  ctx.strokeStyle='rgba(120,200,210,.07)';ctx.lineWidth=1;
+  for(let x=0;x<=W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=-40+gridY;y<=H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  // words
+  ctx.font='700 24px Tajawal,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const w of G.words){
+    ctx.fillStyle='rgba(0,0,0,.7)';ctx.fillRect(w.x-w.w/2,w.y-17,w.w,34);
+    ctx.strokeStyle=w.dying?'#fff':'rgba(240,180,41,.55)';ctx.strokeRect(w.x-w.w/2,w.y-17,w.w,34);
+    const fs=w.item.k=='s'?17:24;ctx.font=`700 ${fs}px Tajawal,sans-serif`;ctx.fillStyle=w.dying?'#fff':'#fff4d6';ctx.fillText(w.item.ar,w.x,w.y+1);
+    {const K={v:['فعل','#60a5fa'],n:['اسم','#f0b429'],a:['صفة','#c084fc'],c:['رابط','#34d399']}[w.item.k];if(K){ctx.font='700 11px Tajawal,sans-serif';ctx.fillStyle=K[1];ctx.fillText(K[0],w.x,w.y-24);ctx.font=`700 ${fs}px Tajawal,sans-serif`}}
+    ctx.fillStyle='#f0b429';ctx.beginPath();ctx.arc(w.x+w.w/2+6,w.y-14,4,0,6.28);ctx.fill()}
+  if(G.ph==2){ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(24,150,W-48,230);ctx.strokeStyle='rgba(240,180,41,.55)';ctx.strokeRect(24,150,W-48,230);ctx.fillStyle='#7b8f93';ctx.font='700 13px Tajawal,sans-serif';ctx.fillText('ترجم إلى الإنجليزية  '+Math.min(G.stageDone+1,G.stageTotal)+'/'+G.stageTotal,W/2,172);
+    if(G.q){ctx.fillStyle='#fff4d6';ctx.font='700 28px Tajawal,sans-serif';wrapT(G.q.ar,225,42);if(G.hint){ctx.fillStyle='#f0b429';ctx.font='700 15px Space Mono,monospace';ctx.fillText('💡 '+G.q.raw.split(' ').slice(0,2).join(' ')+' …',W/2,350)}}else{ctx.fillStyle='#34d399';ctx.font='900 26px Tajawal,sans-serif';ctx.fillText('✔ ممتاز',W/2,265)}}
+  // bullets
+  for(const b of G.bullets){ctx.strokeStyle='#7ff5ff';ctx.lineWidth=3;ctx.beginPath();b.tr.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.lineTo(b.x,b.y);ctx.stroke()}
+  // particles
+  for(const p of G.parts){ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,6.28);ctx.fill()}ctx.globalAlpha=1;
+  // ship
+  let ang=-Math.PI/2;const tg=G.bullets[0]?G.bullets[0].t:null;if(tg)ang=Math.atan2(tg.y-SHIP.y,tg.x-SHIP.x);
+  ctx.save();ctx.translate(SHIP.x,SHIP.y);ctx.rotate(ang+Math.PI/2);ctx.fillStyle='#38e8d6';ctx.strokeStyle='#baffff';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(0,-26);ctx.lineTo(16,18);ctx.lineTo(0,10);ctx.lineTo(-16,18);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+  // typed text
+  const typed=$('inp').value;if(typed){ctx.font='700 18px Space Mono,monospace';ctx.fillStyle='#7ff5ff';ctx.fillText(typed,SHIP.x,SHIP.y+44)}
+  // HUD
+  ctx.textAlign='left';ctx.font='700 16px Space Mono,monospace';ctx.fillStyle='#e8f4f2';ctx.fillText('SCORE '+G.score,56,24);
+  ctx.fillStyle='#7b8f93';ctx.font='12px Space Mono,monospace';ctx.fillText('BEST '+Math.max(best,G.score)+'   x'+G.mul.toFixed(2),56,44);ctx.fillText('♪ '+TH[(G.st||0)%TH.length].n+' '+(MV()+1)+'/4',56,60);ctx.fillText('SPEED '+(baseV()*(G.mul||1)/20).toFixed(1)+'x',56,76);
+  ctx.textAlign='right';ctx.fillStyle='#f0b429';ctx.font='700 14px Space Mono,monospace';ctx.fillText('STAGE '+(G.st+1)+' · '+['WORDS','SAY','TRANS'][G.ph]+'  '+G.stageDone+'/'+G.stageTotal,W-12,24);
+  if(G.combo>2){ctx.fillStyle='#34d399';ctx.fillText('COMBO x'+G.combo,W-12,44)}
+  // shield hex
+  ctx.save();ctx.translate(W-34,H-40);ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;ctx.lineTo(Math.cos(a)*20,Math.sin(a)*20)}ctx.closePath();ctx.fillStyle=G.lives>1?'#f5c518':'#f87171';ctx.fill();
+  ctx.fillStyle='#000';ctx.textAlign='center';ctx.font='700 18px Space Mono,monospace';ctx.fillText(G.lives,0,1);ctx.restore();
+  // reveal
+  if(G.revealT>0){ctx.globalAlpha=Math.min(1,G.revealT);ctx.fillStyle='#f87171';ctx.textAlign='center';ctx.font='700 18px Space Mono,monospace';ctx.fillText(G.reveal,W/2,H-20);ctx.globalAlpha=1}
+  // banner
+  if(G.banner>0){ctx.globalAlpha=Math.min(1,G.banner);ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(0,H/2-50,W,86);ctx.fillStyle='#f0b429';ctx.textAlign='center';ctx.font='900 24px Space Mono,monospace';ctx.fillText(G.bannerTxt,W/2,H/2-8);ctx.fillStyle='#b8c9cc';ctx.font='14px Tajawal,sans-serif';ctx.fillText(G.sub||'',W/2,H/2+20);ctx.globalAlpha=1}
+  if(G.flash>0){ctx.fillStyle=`rgba(248,113,113,${G.flash*.5})`;ctx.fillRect(0,0,W,H)}
+  ctx.restore()}
+function gameOver(){G.over=true;stopMic();let nb='';if(G.score>best){best=G.score;try{localStorage.setItem('wb_best',best)}catch(e){}nb='🏆 رقم قياسي جديد!<br>'}
+  draw();overlay(`<h1>GAME OVER</h1><p>${nb}Score: ${G.score}<br>وصلت إلى ${G.st<D.length?'المرحلة '+(G.st+1):'المرحلة اللانهائية'}</p><button class="btn" onclick="startGame()">🔁 العب مرة أخرى</button>`)}
+function togglePause(){if(!G||G.over)return;G.paused=!G.paused;if(G.paused)overlay(`<h1>PAUSED</h1><button class="btn" onclick="togglePause()">▶ متابعة</button>`);else{$('overlay').classList.add('hide');last=performance.now();$('inp').focus()}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&G&&!G.over&&!G.paused)togglePause()});
+document.addEventListener('keydown',e=>{if(e.key=='Escape')togglePause();else if(G&&!G.over&&!G.paused&&document.activeElement!==$('inp')&&e.key.length==1)$('inp').focus()});
+
+// ---- matching ----
+function target(txt,loose){const v=norm(txt);if(!v)return null;let best=null;
+  for(const w of G.words){if(w.dying)continue;const ok=w.item.en.some(a=>okm(a,v,loose));if(ok&&(!best||w.y>best.y))best=w}
+  return best}
+function hit(w){w.dying=true;G.bullets.push({x:SHIP.x,y:SHIP.y,t:w,tr:[]});beep(1400,.06,'square',.04);say(w.item.en[0])}
+const inp=$('inp');
+inp.addEventListener('input',()=>{if(!G||G.over||G.paused)return;if(G.ph==2){if(ans(inp.value,false))inp.value='';return}const w=target(inp.value,false);if(w){hit(w);inp.value=''}});
+inp.addEventListener('keydown',e=>{if(e.key!=='Enter'||!G||G.over||G.paused)return;if(G.ph==2){const t=inp.value.trim();if(t&&G.q&&!ans(t,false))miss2();inp.value='';return}const w=target(inp.value,false);if(w)hit(w);else if(inp.value.trim()){inp.classList.add('shake');setTimeout(()=>inp.classList.remove('shake'),300)}inp.value=''});
+// ---- speaking ----
+let rec=null;
+function toggleMic(){rec?stopMic():startMic()}
+function startMic(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('استعمل Chrome أو Edge للنطق');return}
+  rec=new SR();rec.lang='en-US';rec.continuous=true;rec.interimResults=true;rec.maxAlternatives=3;
+  rec.onresult=e=>{if(!G||G.over||G.paused)return;const r=e.results[e.results.length-1];let h=null,heard='';
+    for(let k=0;k<r.length;k++){heard=heard||r[k].transcript;if(G.ph==2){if(ans(r[k].transcript,true)){heard=r[k].transcript;try{rec&&rec.stop()}catch(_){}break}continue}const w=target(r[k].transcript,true);if(w){h=w;heard=r[k].transcript;break}}
+    $('heard').textContent='🎧 '+heard;if(h){hit(h);try{rec&&rec.stop()}catch(_){}}};
+  rec.onerror=e=>{if(e.error=='not-allowed'||e.error=='service-not-allowed'){alert('الميكروفون محظور: اضغط على أيقونة القفل 🔒 بجانب عنوان الموقع ← إعدادات الموقع ← الميكروفون ← سماح، ثم أعد تحميل الصفحة. (إن فتحت الملف من جهازك مباشرة فافتحه عبر رابط GitHub Pages)');stopMic()}else if(e.error=='audio-capture'){alert('لم يُعثر على ميكروفون يعمل. تأكد أنه موصول ومحدد في إعدادات الصوت');stopMic()}else if(e.error=='network'){alert('التعرف على الصوت يحتاج إنترنت (Chrome يرسله إلى خوادم Google). تحقق من الاتصال');stopMic()}};
+  rec.onend=()=>{if(rec){try{rec.start()}catch(_){}}};
+  try{rec.start();$('micBtn').classList.add('on')}catch(e){rec=null}}
+function stopMic(){const r=rec;rec=null;$('micBtn').classList.remove('on');if(r)try{r.stop()}catch(_){}}
+speechSynthesis.onvoiceschanged=()=>{};
+G={st:0,ph:0,qT:0,hint:0,q:null,sub:'',words:[],bullets:[],parts:[],lives:4,score:0,combo:0,mul:1,banner:0,flash:0,revealT:0,shake:0,stageDone:0,stageTotal:0,deck:[],ptr:0};
+draw();menu();
+</script></body></html>
